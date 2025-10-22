@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { TouchableOpacity, Text } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -20,14 +21,30 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Text style={{ fontSize: 28, color }}>🏠</Text>
+          ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Fotos',
+          tabBarIcon: ({ color }) => (
+            <Text style={{ fontSize: 28, color }}>📷</Text>
+          ),
+          headerShown: true,
+          headerTitle: 'Galería de Fotos',
+          headerRight: () => (
+            <TouchableOpacity 
+              style={{ marginRight: 15, padding: 5 }}
+              onPress={() => console.log('Botón cámara presionado')}
+            >
+              <Text style={{ fontSize: 24, color: Colors[colorScheme ?? 'light'].tint }}>
+                📷
+              </Text>
+            </TouchableOpacity>
+          ),
         }}
       />
     </Tabs>
