@@ -22,6 +22,7 @@ import * as Sharing from 'expo-sharing';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePhotoStorage } from '@/hooks/use-photo-storage';
+import { useWeatherAPI } from '@/hooks/use-weather-api-fixed';
 import Attractions from '@/components/Attractions';
 
 const { width, height } = Dimensions.get('window');
@@ -58,11 +59,11 @@ export default function HomeScreen() {
   const [selectedPhotoUri, setSelectedPhotoUri] = useState('');
   const [inputUserName, setInputUserName] = useState('');
   const [showWeather, setShowWeather] = useState(false);
-  const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherData, setWeatherData] = useState<any>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const { savePhoto: savePhotoToStorage } = usePhotoStorage();
+  const { fetchCurrentWeather, isLoading: weatherLoading, error: weatherError } = useWeatherAPI();
 
   // Función para formatear fecha automáticamente DD/MM/AAAA
   const formatDateInput = (text: string) => {
@@ -118,28 +119,9 @@ export default function HomeScreen() {
     }
   };
 
-  // Función simple para generar clima
-  const generateSimpleWeather = (startDate: string, endDate: string) => {
-    const temps = [18, 22, 25, 20, 23, 26, 19];
-    const conditions = ['☀️ Soleado', '⛅ Parcialmente nublado', '☁️ Nublado', '🌤️ Despejado'];
-    
-    return {
-      location: 'San Clemente del Tuyú, Buenos Aires',
-      current: {
-        temp: temps[Math.floor(Math.random() * temps.length)],
-        condition: conditions[Math.floor(Math.random() * conditions.length)],
-        humidity: Math.floor(50 + Math.random() * 30),
-        wind: Math.floor(5 + Math.random() * 20)
-      },
-      dates: `${startDate} al ${endDate}`
-    };
-  };
-
   // Effect para mostrar el clima automáticamente cuando se ingresan fechas válidas
   useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    
-    const checkAndShowWeather = () => {
+    const checkAndShowWeather = async () => {
       try {
         console.log('🔍 Verificando fechas:', { startDate, endDate });
         
@@ -148,17 +130,18 @@ export default function HomeScreen() {
           const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
           
           if (dateRegex.test(startDate) && dateRegex.test(endDate)) {
-            console.log('✅ Fechas válidas, generando clima...');
-            setWeatherLoading(true);
+            console.log('✅ Fechas válidas, obteniendo clima real...');
             
-            // Simular delay
-            setTimeout(() => {
-              const weather = generateSimpleWeather(startDate, endDate);
+            try {
+              const weather = await fetchCurrentWeather(startDate, endDate);
               setWeatherData(weather);
               setShowWeather(true);
-              setWeatherLoading(false);
-              console.log('✅ Clima generado:', weather);
-            }, 1000);
+              console.log('✅ Clima obtenido:', weather);
+            } catch (error) {
+              console.error('❌ Error obteniendo clima:', error);
+              setShowWeather(false);
+              setWeatherData(null);
+            }
           } else {
             console.log('❌ Formato de fecha inválido');
             setShowWeather(false);
@@ -176,16 +159,11 @@ export default function HomeScreen() {
       }
     };
 
-    // Debounce: esperar 1.5 segundos
-    timeoutId = setTimeout(checkAndShowWeather, 1500);
-    
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [startDate, endDate]);
+    // Debounce: esperar 1.5 segundos después del último cambio
+    const timeoutId = setTimeout(checkAndShowWeather, 1500);
 
+    return () => clearTimeout(timeoutId);
+  }, [startDate, endDate, fetchCurrentWeather]);
   // Funciones para manejo de fotos
   const requestCameraPermissions = async () => {
     if (Platform.OS === 'web') return true;
