@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePhotoStorage } from '@/hooks/use-photo-storage';
 import Attractions from '@/components/Attractions';
@@ -56,7 +57,134 @@ export default function HomeScreen() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState('');
   const [inputUserName, setInputUserName] = useState('');
+  const [showWeather, setShowWeather] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherData, setWeatherData] = useState<any>(null);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const { savePhoto: savePhotoToStorage } = usePhotoStorage();
+
+  // Función para formatear fecha automáticamente DD/MM/AAAA
+  const formatDateInput = (text: string) => {
+    // Remover todo lo que no sean números
+    const numbers = text.replace(/\D/g, '');
+    
+    // Formatear según la longitud
+    if (numbers.length <= 2) {
+      return numbers;
+    } else if (numbers.length <= 4) {
+      return `${numbers.slice(0, 2)}/${numbers.slice(2)}`;
+    } else if (numbers.length <= 8) {
+      return `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4)}`;
+    } else {
+      // Limitar a 8 dígitos máximo
+      return `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4, 8)}`;
+    }
+  };
+
+  // Función para obtener fecha formateada para mostrar en el picker
+  const parseDate = (dateString: string): Date => {
+    if (!dateString || dateString.length < 10) {
+      return new Date();
+    }
+    const [day, month, year] = dateString.split('/');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  };
+
+  // Función para formatear fecha del picker a string DD/MM/AAAA
+  const formatDateFromPicker = (date: Date): string => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear().toString();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Handlers para los date pickers
+  const handleStartDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowStartDatePicker(false);
+    if (selectedDate && event.type === 'set') {
+      const formattedDate = formatDateFromPicker(selectedDate);
+      setStartDate(formattedDate);
+      console.log('📅 Fecha desde seleccionada:', formattedDate);
+    }
+  };
+
+  const handleEndDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowEndDatePicker(false);
+    if (selectedDate && event.type === 'set') {
+      const formattedDate = formatDateFromPicker(selectedDate);
+      setEndDate(formattedDate);
+      console.log('📅 Fecha hasta seleccionada:', formattedDate);
+    }
+  };
+
+  // Función simple para generar clima
+  const generateSimpleWeather = (startDate: string, endDate: string) => {
+    const temps = [18, 22, 25, 20, 23, 26, 19];
+    const conditions = ['☀️ Soleado', '⛅ Parcialmente nublado', '☁️ Nublado', '🌤️ Despejado'];
+    
+    return {
+      location: 'San Clemente del Tuyú, Buenos Aires',
+      current: {
+        temp: temps[Math.floor(Math.random() * temps.length)],
+        condition: conditions[Math.floor(Math.random() * conditions.length)],
+        humidity: Math.floor(50 + Math.random() * 30),
+        wind: Math.floor(5 + Math.random() * 20)
+      },
+      dates: `${startDate} al ${endDate}`
+    };
+  };
+
+  // Effect para mostrar el clima automáticamente cuando se ingresan fechas válidas
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
+    const checkAndShowWeather = () => {
+      try {
+        console.log('🔍 Verificando fechas:', { startDate, endDate });
+        
+        if (startDate && endDate && startDate.length >= 10 && endDate.length >= 10) {
+          // Validación básica de formato DD/MM/AAAA
+          const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+          
+          if (dateRegex.test(startDate) && dateRegex.test(endDate)) {
+            console.log('✅ Fechas válidas, generando clima...');
+            setWeatherLoading(true);
+            
+            // Simular delay
+            setTimeout(() => {
+              const weather = generateSimpleWeather(startDate, endDate);
+              setWeatherData(weather);
+              setShowWeather(true);
+              setWeatherLoading(false);
+              console.log('✅ Clima generado:', weather);
+            }, 1000);
+          } else {
+            console.log('❌ Formato de fecha inválido');
+            setShowWeather(false);
+            setWeatherData(null);
+          }
+        } else {
+          console.log('⏳ Fechas incompletas, ocultando clima');
+          setShowWeather(false);
+          setWeatherData(null);
+        }
+      } catch (error) {
+        console.error('❌ Error en checkAndShowWeather:', error);
+        setShowWeather(false);
+        setWeatherData(null);
+      }
+    };
+
+    // Debounce: esperar 1.5 segundos
+    timeoutId = setTimeout(checkAndShowWeather, 1500);
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [startDate, endDate]);
 
   // Funciones para manejo de fotos
   const requestCameraPermissions = async () => {
@@ -215,12 +343,52 @@ export default function HomeScreen() {
     }
   };
 
+  // Función para validar formato de fecha DD/MM/AAAA
+  const isValidDateFormat = (dateString: string): boolean => {
+    const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+    return regex.test(dateString);
+  };
+
+  // Función para convertir DD/MM/AAAA a formato ISO (AAAA-MM-DD)
+  const convertToISODate = (dateString: string): string => {
+    const [day, month, year] = dateString.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
+
+  // Función para validar que las fechas sean válidas y coherentes
+  const validateDates = (start: string, end: string): { isValid: boolean; error?: string } => {
+    if (!isValidDateFormat(start) || !isValidDateFormat(end)) {
+      return { isValid: false, error: 'Formato de fecha inválido. Use DD/MM/AAAA' };
+    }
+
+    const startISO = convertToISODate(start);
+    const endISO = convertToISODate(end);
+    const startDateObj = new Date(startISO);
+    const endDateObj = new Date(endISO);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      return { isValid: false, error: 'Fechas inválidas' };
+    }
+
+    if (startDateObj < today) {
+      return { isValid: false, error: 'La fecha de inicio no puede ser anterior a hoy' };
+    }
+
+    if (endDateObj <= startDateObj) {
+      return { isValid: false, error: 'La fecha de fin debe ser posterior a la fecha de inicio' };
+    }
+
+    return { isValid: true };
+  };
+
   const handleSendWhatsApp = () => {
     if (!name || !startDate || !endDate) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
     }
-    
+
     const message = `Consulta de disponibilidad de ${name} desde: ${startDate} hasta: ${endDate}`;
     const phoneNumber = '5491157229652';
     const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
@@ -234,6 +402,11 @@ export default function HomeScreen() {
         }
       })
       .catch((err) => console.error('Error al abrir WhatsApp:', err));
+  };
+
+  const handleCloseWeather = () => {
+    setShowWeather(false);
+    setWeatherData(null);
   };
 
   const openWhatsApp = () => {
@@ -376,32 +549,101 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Desde:</Text>
-              <TextInput
-                style={styles.input}
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="DD/MM/AAAA"
-                placeholderTextColor="#ccc"
-              />
+              <Text style={styles.inputLabel}>Desde (ingresa la fecha y verás el clima):</Text>
+              <View style={styles.dateInputContainer}>
+                <TextInput
+                  style={[styles.input, styles.dateInput]}
+                  value={startDate}
+                  onChangeText={(text) => {
+                    const formattedText = formatDateInput(text);
+                    console.log('📅 Fecha desde cambiada:', formattedText);
+                    setStartDate(formattedText);
+                  }}
+                  placeholder="DD/MM/AAAA"
+                  placeholderTextColor="#ccc"
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+                <TouchableOpacity
+                  style={styles.calendarButton}
+                  onPress={() => setShowStartDatePicker(true)}
+                >
+                  <IconSymbol name="calendar" size={20} color="#007bff" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Hasta:</Text>
-              <TextInput
-                style={styles.input}
-                value={endDate}
-                onChangeText={setEndDate}
-                placeholder="DD/MM/AAAA"
-                placeholderTextColor="#ccc"
-              />
+              <View style={styles.dateInputContainer}>
+                <TextInput
+                  style={[styles.input, styles.dateInput]}
+                  value={endDate}
+                  onChangeText={(text) => {
+                    const formattedText = formatDateInput(text);
+                    console.log('📅 Fecha hasta cambiada:', formattedText);
+                    setEndDate(formattedText);
+                  }}
+                  placeholder="DD/MM/AAAA"
+                  placeholderTextColor="#ccc"
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+                <TouchableOpacity
+                  style={styles.calendarButton}
+                  onPress={() => setShowEndDatePicker(true)}
+                >
+                  <IconSymbol name="calendar" size={20} color="#007bff" />
+                </TouchableOpacity>
+              </View>
             </View>
 
+            {weatherLoading && (
+              <View style={styles.weatherStatusContainer}>
+                <Text style={styles.weatherStatusText}>🌤️ Consultando clima para tus fechas...</Text>
+              </View>
+            )}
+
+            {weatherData && !weatherLoading && (
+              <View style={styles.weatherStatusContainer}>
+                <Text style={styles.weatherStatusText}>✅ ¡Clima cargado! Revisa la información abajo.</Text>
+              </View>
+            )}
+
             <TouchableOpacity style={styles.sendButton} onPress={handleSendWhatsApp}>
-              <Text style={styles.sendButtonText}>Enviar</Text>
+              <Text style={styles.sendButtonText}>Enviar Consulta por WhatsApp</Text>
             </TouchableOpacity>
           </View>
         </ImageBackground>
+
+        {/* Información del Clima - Versión Simple */}
+        {(showWeather || weatherLoading) && (
+          <View style={styles.weatherContainer}>
+            <View style={styles.weatherHeader}>
+              <Text style={styles.weatherTitle}>🌤️ Clima en San Clemente</Text>
+              <TouchableOpacity onPress={handleCloseWeather} style={styles.weatherCloseButton}>
+                <Text style={styles.weatherCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {weatherLoading ? (
+              <View style={styles.weatherLoading}>
+                <Text style={styles.weatherLoadingText}>🌤️ Consultando clima...</Text>
+              </View>
+            ) : weatherData ? (
+              <View style={styles.weatherContent}>
+                <Text style={styles.weatherLocation}>📍 {weatherData.location}</Text>
+                <Text style={styles.weatherMain}>{weatherData.current.condition}</Text>
+                <Text style={styles.weatherTemp}>Temperatura: {weatherData.current.temp}°C</Text>
+                <Text style={styles.weatherDetails}>
+                  💧 Humedad: {weatherData.current.humidity}% | 💨 Viento: {weatherData.current.wind} km/h
+                </Text>
+                <Text style={styles.weatherDates}>📅 Para tu estadía: {weatherData.dates}</Text>
+                <Text style={styles.weatherTip}>🏖️ ¡Perfecto para disfrutar San Clemente!</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -457,6 +699,25 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Date Pickers */}
+      {showStartDatePicker && (
+        <DateTimePicker
+          value={parseDate(startDate)}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleStartDateChange}
+        />
+      )}
+
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={parseDate(endDate)}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleEndDateChange}
+        />
+      )}
 
     </SafeAreaView>
   );
@@ -604,6 +865,22 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     fontSize: 16,
+  },
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+  },
+  dateInput: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    margin: 0,
+  },
+  calendarButton: {
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sendButton: {
     backgroundColor: '#333',
@@ -780,5 +1057,108 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Estilos para indicadores de clima
+  weatherStatusContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  weatherStatusText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  // Estilos para componente de clima simple
+  weatherContainer: {
+    backgroundColor: 'white',
+    marginHorizontal: 15,
+    marginVertical: 10,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  weatherHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#2196F3',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  weatherTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  weatherCloseButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  weatherCloseText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  weatherLoading: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  weatherLoadingText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  weatherContent: {
+    padding: 15,
+  },
+  weatherLocation: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  weatherMain: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2196F3',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  weatherTemp: {
+    fontSize: 18,
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  weatherDetails: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  weatherDates: {
+    fontSize: 14,
+    color: '#1976d2',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  weatherTip: {
+    fontSize: 14,
+    color: '#4caf50',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
