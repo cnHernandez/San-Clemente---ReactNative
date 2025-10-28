@@ -22,7 +22,7 @@ import * as Sharing from 'expo-sharing';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePhotoStorage } from '@/hooks/use-photo-storage';
-import { useWeatherAPI } from '@/hooks/use-weather-api-fixed';
+import { useWeatherAPI, ForecastDay } from '@/hooks/use-weather-api-fixed';
 import Attractions from '@/components/Attractions';
 
 const { width, height } = Dimensions.get('window');
@@ -611,12 +611,41 @@ export default function HomeScreen() {
             ) : weatherData ? (
               <View style={styles.weatherContent}>
                 <Text style={styles.weatherLocation}>📍 {weatherData.location}</Text>
-                <Text style={styles.weatherMain}>{weatherData.current.condition}</Text>
-                <Text style={styles.weatherTemp}>Temperatura: {weatherData.current.temp}°C</Text>
-                <Text style={styles.weatherDetails}>
-                  💧 Humedad: {weatherData.current.humidity}% | 💨 Viento: {weatherData.current.wind} km/h
-                </Text>
-                <Text style={styles.weatherDates}>📅 Para tu estadía: {weatherData.dates}</Text>
+                <Text style={styles.weatherDates}>📅 Pronóstico para tu estadía: {weatherData.dates}</Text>
+                
+                {/* Clima actual */}
+                <View style={styles.currentWeatherSection}>
+                  <Text style={styles.currentWeatherTitle}>🌤️ Clima actual</Text>
+                  <Text style={styles.weatherMain}>{weatherData.current.condition}</Text>
+                  <Text style={styles.weatherTemp}>Temperatura: {weatherData.current.temp}°C</Text>
+                  <Text style={styles.weatherDetails}>
+                    💧 Humedad: {weatherData.current.humidity}% | 💨 Viento: {weatherData.current.wind} km/h
+                  </Text>
+                </View>
+
+                {/* Pronóstico por días */}
+                {weatherData.forecast && weatherData.forecast.length > 0 && (
+                  <View style={styles.forecastSection}>
+                    <Text style={styles.forecastTitle}>📅 Pronóstico día a día</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.forecastScroll}>
+                      {weatherData.forecast.map((day: ForecastDay, index: number) => (
+                        <View key={index} style={styles.forecastCard}>
+                          <Text style={styles.forecastDay}>{day.day}</Text>
+                          <Text style={styles.forecastDate}>{day.date.split('/').slice(0, 2).join('/')}</Text>
+                          <Text style={styles.forecastIcon}>{day.icon}</Text>
+                          <Text style={styles.forecastCondition}>{day.condition.split(' ')[1] || day.condition}</Text>
+                          <View style={styles.forecastTemps}>
+                            <Text style={styles.forecastTempMax}>{day.temp_max}°</Text>
+                            <Text style={styles.forecastTempMin}>{day.temp_min}°</Text>
+                          </View>
+                          <Text style={styles.forecastHumidity}>💧{day.humidity}%</Text>
+                          <Text style={styles.forecastWind}>💨{day.wind}km/h</Text>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+                
                 <Text style={styles.weatherTip}>🏖️ ¡Perfecto para disfrutar San Clemente!</Text>
               </View>
             ) : null}
@@ -1138,5 +1167,98 @@ const styles = StyleSheet.create({
     color: '#4caf50',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  currentWeatherSection: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e3f2fd',
+  },
+  currentWeatherTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1976d2',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  forecastSection: {
+    marginTop: 15,
+  },
+  forecastTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1976d2',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  forecastScrollView: {
+    paddingHorizontal: 5,
+  },
+  forecastScroll: {
+    paddingHorizontal: 5,
+  },
+  forecastCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  forecastDay: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1976d2',
+    marginBottom: 5,
+  },
+  forecastDate: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  forecastIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  forecastTemps: {
+    alignItems: 'center',
+  },
+  forecastMaxTemp: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f57c00',
+  },
+  forecastMinTemp: {
+    fontSize: 14,
+    color: '#1976d2',
+  },
+  forecastTempMax: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f57c00',
+  },
+  forecastTempMin: {
+    fontSize: 14,
+    color: '#1976d2',
+  },
+  forecastCondition: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  forecastHumidity: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 3,
+  },
+  forecastWind: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
   },
 });
